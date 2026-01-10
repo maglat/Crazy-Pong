@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Pong – Zufälliger großer Ball (10 Punkte)</title>
+<style>
+  body {margin:0; background:#000; display:flex; justify-content:center; align-items:center; height:100vh;}
+  canvas {background:#111; border:2px solid #555;}
+</style>
+</head>
+<body>
+
+<canvas id="pong" width="600" height="400"></canvas>
+
+<script>
+/* -------------------------------------------------
+   Grundvariablen
+   ------------------------------------------------- */
+const canvas = document.getElementById('pong');
+const ctx    = canvas.getContext('2d');
+
+const paddleW = 10, paddleH = 80, ballR = 8;          // normale Ball‑Radius
+let   largeBallExists = false;                       // gibt es gerade den großen Ball?
+
+/* ---- Player ---- */
+const player = {
+  x:10, y:canvas.height/2-paddleH/2,
+  w:paddleW, h:paddleH, score:0,
+  maxDistX:null
+};
+
+/* ---- Computer ---- */
+const computer = {
+  x:canvas.width-paddleW-10,
+  y:canvas.height/2-paddleH/2,
+  w:paddleW, h:paddleH, score:0,
+  maxDistX:null
+};
+
+/* ---- Bälle (normale) ---- */
+function createBall(){                               // normale Größe
+  return {x:canvas.width/2, y:canvas.height/2,
+          vx:4*(Math.random()>0.5?1:-1),
+          vy:2*(Math.random()>0.5?1:-1),
+          r:ballR};
+}
+let balls = [createBall()];
+
+/* ---- Tastatur (Pfeiltasten) ---- */
+const keys = {};
+document.addEventListener('keydown', e=>keys[e.key]=true);
+document.addEventListener('keyup',   e=>keys[e.key]=false);
+
+/* ---- Feuerwerk (bei Punkt) ---- */
+let fireworks = [];
+const fireworkCount = 30, fireworkSpeed = 3;
+function spawnFirework(){
+  const cx=canvas.width/2, cy=canvas.height/2;
+  for(let i=0;i<fireworkCount;i++){
+    const a=Math.random()*Math.PI*2;
+    const s=Math.random()*fireworkSpeed+1;
+    fireworks.push({x:cx,y:cy,
+      vx:Math.cos(a)*s, vy:Math.sin(a)*s,
+      life:30,
+      color:`hsl(${Math.random()*360},80%,60%)`});
+  }
+}
+function updateFirework(){
+  fireworks.forEach(p=>{p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.life--;});
+  fireworks = fireworks.filter(p=>p.life>0);
+}
+function drawFirework(){
+  fireworks.forEach(p=>{
+    ctx.fillStyle=p.color;
+    ctx.globalAlpha=p.life/30;
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  });
+}
+
+/* -------------------------------------------------
+   Hilfsfunktionen
+   ------------------------------------------------- */
+function drawRect(x,y,w,h,c){ctx.fillStyle=c; ctx.fillRect(x,y,w,h);}
+function drawCircle(x,y,r,c){
+  ctx.fillStyle=c;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.closePath(); ctx.fill();
+}
+function collide(ball,p){
+  return ball.x-ball.r < p.x+p.w &&
+         ball.x+ball.r > p.x &&
+         ball.y-ball.r < p.y+p.h &&
+         ball.y+ball.r > p.y;
+}
+
+/* -------------------------------------------------
+   Max‑Dist‑Werte (Mittellinie)
+   ------------------------------------------------- */
+function initMaxDist(){
+  player.maxDistX   = (canvas.width/2) - (player.x+player.w);
+  computer.maxDistX = computer.x - (canvas.width/2);
+}
+initMaxDist();
+
+/* -------------------------------------------------
+   KI – Ziel‑Ball für den Gegner
+   ------------------------------------------------- */
+function getTargetBall(){
+  // Ball, der als Nächstes die rechte Seite passiert
+  let best=null, bestTime=Infinity;
+  balls.forEach(b=>{
+    if(b.vx>0){
+      const t=(computer.x-b.x)/b.vx;
+      if(t<bestTime){bestTime=t; best=b;}
+    }
+  });
+  return best||balls[0];
+}
+
+/* -------------------------------------------------
+   Update – Spiel‑Logik
+   ------------------------------------------------- */
+function update(){
+  /* ---- Player (Pfeiltasten) ---- */
+  if(keys['ArrowUp'])    player.y -= 6;
+  if(keys['ArrowDown'])  player.y += 6;
+  player.y = Math.max(0, Math.min(canvas.height-paddleH, player.y));
+
+  // horizontale Bewegung bis zur eigenen Mittellinie
+  if(keys['ArrowRight']) player.x += 6;          // normale Geschwindigkeit
+  if(keys['ArrowLeft'])  player.x -= 3;          // halbe Geschwindigkeit zurück
+  player.x = Math.max(10,
+            Math.min(canvas.width/2 - paddleW, player.x));
+
+  /* ---- Computer – vertikal taktisch ---- */
+  const tgt = getTargetBall();                     // Ball, den er „abschießen“ will
+  // Vorhersage, wo der Ball die X‑Position des Computers treffen wird
+  const dx   = computer.x - tgt.x;
+  const predY = tgt.y + (dx/tgt.vx)*tgt.vy;
+  const goalY = Math.min(Math.max(predY, paddleH/2), canvas.height-paddleH/2);
+
+  if(computer.y + paddleH/2 < goalY) computer.y += 4;
+  else if(computer.y + paddleH/2 > goalY) computer.y -= 4;
+  computer.y = Math.max(0, Math.min(canvas.height-paddleH, computer.y));
+
+  /* ---- Zufälliger großer Ball (einmal gleichzeitig) ---- */
+  if(!largeBallExists && Math.random()<0.004){   // ca. 0,4 % pro Frame → alle paar Sekunden
+    largeBallExists = true;
+    balls.push({
+      x:canvas.width/2,
+      y:canvas.height/2,
+      vx:4*(Math.random()>0.5?1:-1),
+      vy:2*(Math.random()>0.5?1:-1),
+      r:ballR*3,                  // 3‑fach größer
+      color:'#f0f'                // eigene Farbe für die Anzeige
+    });
+  }
+
+  /* ---- Bälle durchgehen ---- */
+  balls.forEach((ball,i)=>{   // i ist der Index im Array
+    // Bewegung
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    // Wand‑Kollision
+    if(ball.y-ball.r<0 || ball.y+ball.r>canvas.height) ball.vy*=-1;
+
+    // Kollision mit Player
+    if(collide(ball,player) && ball.vx<0){
+      const curDist = (canvas.width/2) - (player.x+player.w);
+      const factor  = 1 - curDist/player.maxDistX;   // 0…1
+      const mult    = 1 + factor;                  // 1…2
+      ball.vx = -ball.vx * mult;
+      ball.vy = (ball.y-(player.y+paddleH/2))*0.15;
+    }
+
+    // Kollision mit Computer
+    if(collide(ball,computer) && ball.vx>0){
+      const curDist = computer.x - (canvas.width/2);
+      const factor  = 1 - curDist/computer.maxDistX;
+      const mult    = 1 + factor;
+      ball.vx = -ball.vx * mult;
+      ball.vy = (ball.y-(computer.y+paddleH/2))*0.15;
+    }
+
+    // Punkt erzielt?
+    if(ball.x < 0){                     // Ball geht nach links → Computer punktet
+      const points = (ball.r===ballR*3) ? 10 : 1;
+      computer.score += points;
+      spawnFirework();
+
+      // Ball zurücksetzen oder entfernen
+      if(ball.r===ballR*3){
+        // großer Ball wird entfernt, kein neuer Ball erzeugt
+        balls.splice(i,1);
+        largeBallExists = false;
+      }else{
+        // normaler Ball zurücksetzen
+        ball.x = canvas.width/2;
+        ball.y = canvas.height/2;
+        ball.vx = 4*(Math.random()>0.5?1:-1);
+        ball.vy = 2*(Math.random()>0.5?1:-1);
+        // ggf. neuen normalen Ball hinzufügen (max 5)
+        const normCount = balls.filter(b=>b.r===ballR).length;
+        if(normCount<5) balls.push(createBall());
+      }
+    } else if(ball.x > canvas.width){   // Ball geht nach rechts → Player punktet
+      const points = (ball.r===ballR*3) ? 10 : 1;
+      player.score += points;
+      spawnFirework();
+
+      if(ball.r===ballR*3){
+        balls.splice(i,1);
+        largeBallExists = false;
+      }else{
+        ball.x = canvas.width/2;
+        ball.y = canvas.height/2;
+        ball.vx = 4*(Math.random()>0.5?1:-1);
+        ball.vy = 2*(Math.random()>0.5?1:-1);
+        const normCount = balls.filter(b=>b.r===ballR).length;
+        if(normCount<5) balls.push(createBall());
+      }
+    }
+  });
+
+  updateFirework();
+}
+
+/* -------------------------------------------------
+   Render – alles auf das Canvas malen
+   ------------------------------------------------- */
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Paddles
+  drawRect(player.x,   player.y,   player.w, player.h,   '#fff');
+  drawRect(computer.x, computer.y, computer.w, computer.h, '#fff');
+
+  // Bälle (normale & große)
+  balls.forEach(b=>{
+    const col = (b.r===ballR*3) ? '#f0f' : '#ff0';
+    drawCircle(b.x,b.y,b.r,col);
+  });
+
+  // Score
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px Arial';
+  ctx.fillText(player.score,   canvas.width/4,30);
+  ctx.fillText(computer.score, 3*canvas.width/4,30);
+
+  // Feuerwerk
+  drawFirework();
+}
+
+/* -------------------------------------------------
+   Haupt‑Loop
+   ------------------------------------------------- */
+function loop(){ update(); render(); requestAnimationFrame(loop); }
+loop();
+</script>
+
+</body>
+</html>
