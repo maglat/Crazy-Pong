@@ -2,56 +2,60 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Pong – Zufälliger großer Ball (10 Punkte)</title>
+<title>Pong – kleinere Touch‑Buttons</title>
 <style>
-  body {margin:0; background:#000; display:flex; justify-content:center; align-items:center; height:100vh;}
-  canvas {background:#111; border:2px solid #555;}
+  /* ----- Layout ------------------------------------------------- */
+  body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;}
+  .wrapper{position:relative;width:80vw;max-width:600px;}
+  canvas{width:100%;height:auto;background:#111;border:2px solid #555;display:block;}
+
+  /* ----- Touch‑Buttons (kleiner) -------------------------------- */
+  .controls{position:absolute;left:50%;top: calc(100% + 5%);transform:translateX(-50%);display:grid;grid-template-areas:". up ." "left . right" ". down .";gap:0.5rem;}
+  .controls button{--size: calc(6vw + 6vh);width:var(--size);height:var(--size);font-size:calc(var(--size) * 0.4);border:none;border-radius:8px;background:#fff7;color:#222;cursor:pointer;user-select:none;}
+  .controls button:active{background:#fff9;}
+  .up{grid-area:up;}.down{grid-area:down;}.left{grid-area:left;}.right{grid-area:right;}
 </style>
 </head>
 <body>
-
-<canvas id="pong" width="600" height="400"></canvas>
-
+<div class="wrapper">
+  <canvas id="pong" width="600" height="400"></canvas>
+  <!-- Touch‑Buttons -->
+  <div class="controls">
+    <button class="up">↑</button>
+    <button class="left">←</button>
+    <button class="right">→</button>
+    <button class="down">↓</button>
+  </div>
+</div>
 <script>
 /* -------------------------------------------------
    Grundvariablen
    ------------------------------------------------- */
 const canvas = document.getElementById('pong');
 const ctx    = canvas.getContext('2d');
-
-const paddleW = 10, paddleH = 80, ballR = 8;          // normale Ball‑Radius
-let   largeBallExists = false;                       // gibt es gerade den großen Ball?
-
+const paddleW = 10, paddleH = 80, ballR = 8;
+let   largeBallExists = false;
 /* ---- Player ---- */
-const player = {
-  x:10, y:canvas.height/2-paddleH/2,
-  w:paddleW, h:paddleH, score:0,
-  maxDistX:null
-};
-
+const player = {x:10, y:canvas.height/2-paddleH/2,w:paddleW, h:paddleH, score:0, maxDistX:null};
 /* ---- Computer ---- */
-const computer = {
-  x:canvas.width-paddleW-10,
-  y:canvas.height/2-paddleH/2,
-  w:paddleW, h:paddleH, score:0,
-  maxDistX:null
-};
-
-/* ---- Bälle (normale) ---- */
-function createBall(){                               // normale Größe
-  return {x:canvas.width/2, y:canvas.height/2,
-          vx:4*(Math.random()>0.5?1:-1),
-          vy:2*(Math.random()>0.5?1:-1),
-          r:ballR};
-}
+const computer = {x:canvas.width-paddleW-10, y:canvas.height/2-paddleH/2,w:paddleW, h:paddleH, score:0, maxDistX:null};
+/* ---- Normale Bälle ---- */
+function createBall(){ return {x:canvas.width/2, y:canvas.height/2,vx:4*(Math.random()>0.5?1:-1),vy:2*(Math.random()>0.5?1:-1),r:ballR };}
 let balls = [createBall()];
-
-/* ---- Tastatur (Pfeiltasten) ---- */
+/* ---- Tastatur‑/Touch‑State ---- */
 const keys = {};
 document.addEventListener('keydown', e=>keys[e.key]=true);
 document.addEventListener('keyup',   e=>keys[e.key]=false);
-
-/* ---- Feuerwerk (bei Punkt) ---- */
+function press(key){ keys[key]=true; }
+function release(key){ keys[key]=false; }
+document.querySelectorAll('.controls button').forEach(btn=>{
+  const map = {up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'};
+  const key = map[btn.className];
+  btn.addEventListener('pointerdown',()=>press(key));
+  btn.addEventListener('pointerup',  ()=>release(key));
+  btn.addEventListener('pointerleave',()=>release(key));
+});
+/* ---- Feuerwerk ---- */
 let fireworks = [];
 const fireworkCount = 30, fireworkSpeed = 3;
 function spawnFirework(){
@@ -59,10 +63,7 @@ function spawnFirework(){
   for(let i=0;i<fireworkCount;i++){
     const a=Math.random()*Math.PI*2;
     const s=Math.random()*fireworkSpeed+1;
-    fireworks.push({x:cx,y:cy,
-      vx:Math.cos(a)*s, vy:Math.sin(a)*s,
-      life:30,
-      color:`hsl(${Math.random()*360},80%,60%)`});
+    fireworks.push({x:cx,y:cy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:30,color:`hsl(${Math.random()*360},80%,60%)`});
   }
 }
 function updateFirework(){
@@ -71,193 +72,48 @@ function updateFirework(){
 }
 function drawFirework(){
   fireworks.forEach(p=>{
-    ctx.fillStyle=p.color;
-    ctx.globalAlpha=p.life/30;
-    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha=1;
+    ctx.fillStyle=p.color;ctx.globalAlpha=p.life/30;ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
   });
 }
-
 /* -------------------------------------------------
    Hilfsfunktionen
    ------------------------------------------------- */
-function drawRect(x,y,w,h,c){ctx.fillStyle=c; ctx.fillRect(x,y,w,h);}
-function drawCircle(x,y,r,c){
-  ctx.fillStyle=c;
-  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.closePath(); ctx.fill();
-}
-function collide(ball,p){
-  return ball.x-ball.r < p.x+p.w &&
-         ball.x+ball.r > p.x &&
-         ball.y-ball.r < p.y+p.h &&
-         ball.y+ball.r > p.y;
-}
-
+function drawRect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h);}
+function drawCircle(x,y,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.closePath();ctx.fill();}
+function collide(ball,p){return ball.x-ball.r < p.x+p.w && ball.x+ball.r > p.x && ball.y-ball.r < p.y+p.h && ball.y+ball.r > p.y;}
 /* -------------------------------------------------
    Max‑Dist‑Werte (Mittellinie)
    ------------------------------------------------- */
-function initMaxDist(){
-  player.maxDistX   = (canvas.width/2) - (player.x+player.w);
-  computer.maxDistX = computer.x - (canvas.width/2);
-}
-initMaxDist();
-
+function initMaxDist(){player.maxDistX=(canvas.width/2)-(player.x+player.w);computer.maxDistX=computer.x-(canvas.width/2);}initMaxDist();
 /* -------------------------------------------------
    KI – Ziel‑Ball für den Gegner
    ------------------------------------------------- */
-function getTargetBall(){
-  // Ball, der als Nächstes die rechte Seite passiert
-  let best=null, bestTime=Infinity;
-  balls.forEach(b=>{
-    if(b.vx>0){
-      const t=(computer.x-b.x)/b.vx;
-      if(t<bestTime){bestTime=t; best=b;}
-    }
-  });
-  return best||balls[0];
-}
-
+function getTargetBall(){let best=null, bestTime=Infinity;balls.forEach(b=>{if(b.vx>0){const t=(computer.x-b.x)/b.vx;if(t<bestTime){bestTime=t;best=b;}}});return best||balls[0];}
 /* -------------------------------------------------
    Update – Spiel‑Logik
    ------------------------------------------------- */
 function update(){
-  /* ---- Player (Pfeiltasten) ---- */
   if(keys['ArrowUp'])    player.y -= 6;
   if(keys['ArrowDown'])  player.y += 6;
   player.y = Math.max(0, Math.min(canvas.height-paddleH, player.y));
-
-  // horizontale Bewegung bis zur eigenen Mittellinie
-  if(keys['ArrowRight']) player.x += 6;          // normale Geschwindigkeit
-  if(keys['ArrowLeft'])  player.x -= 3;          // halbe Geschwindigkeit zurück
-  player.x = Math.max(10,
-            Math.min(canvas.width/2 - paddleW, player.x));
-
-  /* ---- Computer – vertikal taktisch ---- */
-  const tgt = getTargetBall();                     // Ball, den er „abschießen“ will
-  // Vorhersage, wo der Ball die X‑Position des Computers treffen wird
-  const dx   = computer.x - tgt.x;
-  const predY = tgt.y + (dx/tgt.vx)*tgt.vy;
+  if(keys['ArrowRight']) player.x += 6;
+  if(keys['ArrowLeft'])  player.x -= 3;
+  player.x = Math.max(10, Math.min(canvas.width/2 - paddleW, player.x));
+  const target = getTargetBall();
+  const dx   = computer.x - target.x;
+  const predY = target.y + (dx/target.vx)*target.vy;
   const goalY = Math.min(Math.max(predY, paddleH/2), canvas.height-paddleH/2);
-
-  if(computer.y + paddleH/2 < goalY) computer.y += 4;
-  else if(computer.y + paddleH/2 > goalY) computer.y -= 4;
+  if(computer.y + paddleH/2 < goalY) computer.y += 4; else if(computer.y + paddleH/2 > goalY) computer.y -= 4;
   computer.y = Math.max(0, Math.min(canvas.height-paddleH, computer.y));
-
-  /* ---- Zufälliger großer Ball (einmal gleichzeitig) ---- */
-  if(!largeBallExists && Math.random()<0.004){   // ca. 0,4 % pro Frame → alle paar Sekunden
-    largeBallExists = true;
-    balls.push({
-      x:canvas.width/2,
-      y:canvas.height/2,
-      vx:4*(Math.random()>0.5?1:-1),
-      vy:2*(Math.random()>0.5?1:-1),
-      r:ballR*3,                  // 3‑fach größer
-      color:'#f0f'                // eigene Farbe für die Anzeige
-    });
-  }
-
-  /* ---- Bälle durchgehen ---- */
-  balls.forEach((ball,i)=>{   // i ist der Index im Array
-    // Bewegung
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-
-    // Wand‑Kollision
-    if(ball.y-ball.r<0 || ball.y+ball.r>canvas.height) ball.vy*=-1;
-
-    // Kollision mit Player
-    if(collide(ball,player) && ball.vx<0){
-      const curDist = (canvas.width/2) - (player.x+player.w);
-      const factor  = 1 - curDist/player.maxDistX;   // 0…1
-      const mult    = 1 + factor;                  // 1…2
-      ball.vx = -ball.vx * mult;
-      ball.vy = (ball.y-(player.y+paddleH/2))*0.15;
-    }
-
-    // Kollision mit Computer
-    if(collide(ball,computer) && ball.vx>0){
-      const curDist = computer.x - (canvas.width/2);
-      const factor  = 1 - curDist/computer.maxDistX;
-      const mult    = 1 + factor;
-      ball.vx = -ball.vx * mult;
-      ball.vy = (ball.y-(computer.y+paddleH/2))*0.15;
-    }
-
-    // Punkt erzielt?
-    if(ball.x < 0){                     // Ball geht nach links → Computer punktet
-      const points = (ball.r===ballR*3) ? 10 : 1;
-      computer.score += points;
-      spawnFirework();
-
-      // Ball zurücksetzen oder entfernen
-      if(ball.r===ballR*3){
-        // großer Ball wird entfernt, kein neuer Ball erzeugt
-        balls.splice(i,1);
-        largeBallExists = false;
-      }else{
-        // normaler Ball zurücksetzen
-        ball.x = canvas.width/2;
-        ball.y = canvas.height/2;
-        ball.vx = 4*(Math.random()>0.5?1:-1);
-        ball.vy = 2*(Math.random()>0.5?1:-1);
-        // ggf. neuen normalen Ball hinzufügen (max 5)
-        const normCount = balls.filter(b=>b.r===ballR).length;
-        if(normCount<5) balls.push(createBall());
-      }
-    } else if(ball.x > canvas.width){   // Ball geht nach rechts → Player punktet
-      const points = (ball.r===ballR*3) ? 10 : 1;
-      player.score += points;
-      spawnFirework();
-
-      if(ball.r===ballR*3){
-        balls.splice(i,1);
-        largeBallExists = false;
-      }else{
-        ball.x = canvas.width/2;
-        ball.y = canvas.height/2;
-        ball.vx = 4*(Math.random()>0.5?1:-1);
-        ball.vy = 2*(Math.random()>0.5?1:-1);
-        const normCount = balls.filter(b=>b.r===ballR).length;
-        if(normCount<5) balls.push(createBall());
-      }
-    }
-  });
-
+  if(!largeBallExists && Math.random()<0.004){largeBallExists=true;balls.push({x:canvas.width/2,y:canvas.height/2,vx:4*(Math.random()>0.5?1:-1),vy:2*(Math.random()>0.5?1:-1),r:ballR*3,color:'#f0f'});}
+  balls.forEach((ball,i)=>{ball.x+=ball.vx;ball.y+=ball.vy;if(ball.y-ball.r<0||ball.y+ball.r>canvas.height)ball.vy*=-1;if(collide(ball,player)&&ball.vx<0){const curDist=(canvas.width/2)-(player.x+player.w);const factor=1-curDist/player.maxDistX;const mult=1+factor;ball.vx=-ball.vx*mult;ball.vy=(ball.y-(player.y+paddleH/2))*0.15;}if(collide(ball,computer)&&ball.vx>0){const curDist=computer.x-(canvas.width/2);const factor=1-curDist/computer.maxDistX;const mult=1+factor;ball.vx=-ball.vx*mult;ball.vy=(ball.y-(computer.y+paddleH/2))*0.15;}if(ball.x<0){const pts=ball.r===ballR*3?10:1;computer.score+=pts;spawnFirework();if(ball.r===ballR*3){balls.splice(i,1);largeBallExists=false;}else{ball.x=canvas.width/2;ball.y=canvas.height/2;ball.vx=4*(Math.random()>0.5?1:-1);ball.vy=2*(Math.random()>0.5?1:-1);const normCnt=balls.filter(b=>b.r===ballR).length;if(normCnt<5)balls.push(createBall());}}else if(ball.x>canvas.width){const pts=ball.r===ballR*3?10:1;player.score+=pts;spawnFirework();if(ball.r===ballR*3){balls.splice(i,1);largeBallExists=false;}else{ball.x=canvas.width/2;ball.y=canvas.height/2;ball.vx=4*(Math.random()>0.5?1:-1);ball.vy=2*(Math.random()>0.5?1:-1);const normCnt=balls.filter(b=>b.r===ballR).length;if(normCnt<5)balls.push(createBall());}}});
   updateFirework();
 }
-
 /* -------------------------------------------------
-   Render – alles auf das Canvas malen
+   Render
    ------------------------------------------------- */
-function render(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // Paddles
-  drawRect(player.x,   player.y,   player.w, player.h,   '#fff');
-  drawRect(computer.x, computer.y, computer.w, computer.h, '#fff');
-
-  // Bälle (normale & große)
-  balls.forEach(b=>{
-    const col = (b.r===ballR*3) ? '#f0f' : '#ff0';
-    drawCircle(b.x,b.y,b.r,col);
-  });
-
-  // Score
-  ctx.fillStyle = '#fff';
-  ctx.font = '20px Arial';
-  ctx.fillText(player.score,   canvas.width/4,30);
-  ctx.fillText(computer.score, 3*canvas.width/4,30);
-
-  // Feuerwerk
-  drawFirework();
-}
-
-/* -------------------------------------------------
-   Haupt‑Loop
-   ------------------------------------------------- */
-function loop(){ update(); render(); requestAnimationFrame(loop); }
-loop();
+function render(){ctx.clearRect(0,0,canvas.width,canvas.height);drawRect(player.x,player.y,player.w,player.h,'#fff');drawRect(computer.x,computer.y,computer.w,computer.h,'#fff');balls.forEach(b=>{const col=b.r===ballR*3?'#f0f':'#ff0';drawCircle(b.x,b.y,b.r,col);});ctx.fillStyle='#fff';ctx.font='20px Arial';ctx.fillText(player.score,canvas.width/4,30);ctx.fillText(computer.score,3*canvas.width/4,30);drawFirework();}
+function loop(){update();render();requestAnimationFrame(loop);}loop();
 </script>
-
 </body>
 </html>
