@@ -1,13 +1,15 @@
 # Crazy-Pong
 
-A small, web‑based Pong clone with a few extra features:
+## Version v1.1
 
-* **Fireworks** whenever a point is scored
-* **Tactical AI** – the computer predicts where the next ball will hit its paddle
-* **Multiple balls** (up to 5) and a **random giant ball** (3× bigger) that gives 10 points
-* **Player control** via the arrow keys:
-  * `↑` / `↓` – move the paddle up / down
-  * `←` – move the paddle a little bit back (half speed)
-  * `→` – move the paddle forward to the middle line (full speed)
+Ein einfaches Pong‑Spiel, das im Browser läuft.  
 
-Open `index.html` in a browser and start playing!
+**Steuerung**
+- **Pfeiltasten** – nach oben, unten, links, rechts (wie gehabt).
+- **Touch‑Buttons** – vier Buttons unter dem Spielfeld (↑ ↓ ← →); sie skalieren mit der Fenstergröße und erzeugen dieselben Tastencodes.
+
+Das Spiel enthält:
+- KI‑Gegner, mehrere Bälle, einen zufälligen großen Ball (10 Punkte) und ein Feuerwerk‑Effect.
+- Dynamische Anpassung der Paddle‑Geschwindigkeit je nach Abstand zur Mittellinie.
+
+Dieses Repository enthält die aktuelle `index.html` und diese `README.md`.
