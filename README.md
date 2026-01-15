@@ -1,7 +1,9 @@
 # Crazy-Pong
 
-## Version v1.1
+## Version v1.1.1
+Kleinanpassung: Das Spielfeld wurde nach oben verschoben und die Touch‑Buttons wandern nun mit dem Feld mit. (Siehe `index.html`.)
 
+## Version v1.1
 Ein einfaches Pong‑Spiel, das im Browser läuft.  
 
 **Steuerung**
